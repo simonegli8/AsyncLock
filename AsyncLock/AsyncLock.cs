@@ -19,7 +19,7 @@ namespace NeoSmart.AsyncLock
         internal SemaphoreSlim _retry = new SemaphoreSlim(0, 1);
         private const long UnlockedId = 0x00; // "owning" task id when unlocked
         internal long _owningId = UnlockedId;
-        internal int _owningThreadId = (int) UnlockedId;
+        internal int _owningThreadId = (int)UnlockedId;
         private static long AsyncStackCounter = 0;
         // An AsyncLocal<T> is not really the task-based equivalent to a ThreadLocal<T>, in that
         // it does not track the async flow (as the documentation describes) but rather it is
@@ -93,7 +93,8 @@ namespace NeoSmart.AsyncLock
                 // In case of zero-timeout, don't even wait for protective lock contention
                 if (timeout == TimeSpan.Zero)
                 {
-                    _parent._reentrancy.Wait(timeout);
+                    //BUG? _parent._reentrancy.Wait(timeout);
+                    if (!_parent._reentrancy.Wait(timeout)) return null;
                     if (InnerTryEnter(synchronous: false))
                     {
                         // Reset the owning thread id after all await calls have finished, otherwise we
@@ -113,7 +114,8 @@ namespace NeoSmart.AsyncLock
                 // We need to wait for someone to leave the lock before trying again.
                 while (remainder > TimeSpan.Zero)
                 {
-                    await _parent._reentrancy.WaitAsync(remainder).ConfigureAwait(false);
+                    //BUG? await _parent._reentrancy.WaitAsync(remainder).ConfigureAwait(false);
+                    if (!await _parent._reentrancy.WaitAsync(remainder).ConfigureAwait(false)) return null;
                     if (InnerTryEnter(synchronous: false))
                     {
                         // Reset the owning thread id after all await calls have finished, otherwise we
@@ -122,12 +124,14 @@ namespace NeoSmart.AsyncLock
                         _parent._reentrancy.Release();
                         return this;
                     }
-                    _parent._reentrancy.Release();
+                    //BUG? _parent._reentrancy.Release();
 
                     now = DateTimeOffset.UtcNow;
                     remainder -= now - last;
                     last = now;
-                    if (remainder < TimeSpan.Zero)
+                    //BUG? if (remainder < TimeSpan.Zero)
+                    // <= is correct, cause the loop invariant is remainder > TimeSpan.Zero, and the need to release reentrnacy
+                    if (remainder <= TimeSpan.Zero)
                     {
                         _parent._reentrancy.Release();
                         return null;
@@ -202,7 +206,8 @@ namespace NeoSmart.AsyncLock
                 // In case of zero-timeout, don't even wait for protective lock contention
                 if (timeout == TimeSpan.Zero)
                 {
-                    _parent._reentrancy.Wait(timeout);
+                    //BUG? _parent._reentrancy.Wait(timeout);
+                    if (!_parent._reentrancy.Wait(timeout)) return null;
                     if (InnerTryEnter(synchronous: true))
                     {
                         _parent._reentrancy.Release();
@@ -219,7 +224,8 @@ namespace NeoSmart.AsyncLock
                 // We need to wait for someone to leave the lock before trying again.
                 while (remainder > TimeSpan.Zero)
                 {
-                    _parent._reentrancy.Wait(remainder);
+                    //BUG? _parent._reentrancy.Wait(remainder);
+                    if (!_parent._reentrancy.Wait(remainder)) return null;
                     if (InnerTryEnter(synchronous: true))
                     {
                         _parent._reentrancy.Release();
