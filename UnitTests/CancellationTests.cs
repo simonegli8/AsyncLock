@@ -21,7 +21,7 @@ namespace AsyncLockTests
             {
                 await @lock.LockAsync(cts.Token);
             }).Wait();
-            Assert.ThrowsExceptionAsync<OperationCanceledException>(async () =>
+            Assert.ThrowsAsync<OperationCanceledException>(async () =>
             {
                 using (await @lock.LockAsync(cts.Token))
                     Assert.Fail("should never reach here if cancellation works properly");
@@ -47,7 +47,7 @@ namespace AsyncLockTests
                 }
             }).Start();
 
-            Assert.ThrowsException<OperationCanceledException>(() =>
+            Assert.Throws<OperationCanceledException>(() =>
             {
                 delayStarted.Wait();
                 using (asyncLock.Lock(cts.Token))

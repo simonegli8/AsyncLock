@@ -30,7 +30,7 @@ namespace AsyncLockTests
         {
             var @lock = new AsyncLock();
 
-            await Assert.ThrowsExceptionAsync<LocalException>(async () =>
+            await Assert.ThrowsAsync<LocalException>(async () =>
             {
                 await @lock.TryLockAsync(async () => {
                     await Task.Yield();
