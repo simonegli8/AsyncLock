@@ -1,13 +1,14 @@
-﻿using System;
+﻿using NeoSmart.AsyncLock;
+using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using System.IO;
 
-namespace AspNetCoreSharedServer;
+namespace NeoSmart.AsyncLock;
 
 
 public class AsyncMutexLock
@@ -379,7 +380,7 @@ public class AsyncMutexLock
         }
 
         // Mutex code
-        Mutex mutex;
+        FileStream LockFileStream;
         bool owned = false;
         string name => _parent.name;
         int FlockFile = -1;
@@ -399,29 +400,127 @@ public class AsyncMutexLock
         [DllImport("libc", SetLastError = true)]
         private static extern int close(int fd);
 
-        private bool TryMutexAcquireOnce()
+        const int MaxUnauthorizedAccessExceptionRetries = 1600;
+        private static bool CanRetryTransientFileSystemError(ref int retryCount)
+        {
+            if (retryCount >= MaxUnauthorizedAccessExceptionRetries) { return false; }
+
+            ++retryCount;
+
+            return true;
+        }
+        private void EnsureDirectoryExists()
+        {
+            var retryCount = 0;
+
+            var directory = Path.GetDirectoryName(name);
+            while (true)
+            {
+                try
+                {
+                    Directory.CreateDirectory(directory);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    // This can indicate either a transient failure during concurrent creation/deletion or a permissions issue.
+                    // If we encounter it, assume it is transient unless it persists.
+                    // For a long time, I just checked for UnauthorizedAccessException here. However, recent tests on Linux have
+                    // shown that in race conditions we can see IOException as well, presumably because there is some period during
+                    // directory creation where it presents as a file.
+                    if (ex is UnauthorizedAccessException or IOException
+                        && CanRetryTransientFileSystemError(ref retryCount))
+                    {
+                        continue;
+                    }
+
+                    throw new InvalidOperationException($"Failed to ensure that lock file directory {directory} exists", ex);
+                }
+            }
+        }
+
+        private bool TryMutexAcquireOnce(CancellationToken cancel = default)
         {
             if (IsWindows)
             {
-                mutex ??= new Mutex(false, name);
+                int retryCount = 0;
 
-                try
+                while (true)
                 {
-                    if (mutex.WaitOne(0))
+                    cancel.ThrowIfCancellationRequested();
+
+                    EnsureDirectoryExists();
+
+                    FileStream lockFileStream;
+                    try
                     {
-                        owned = true;
-                        return true;
+                        // key arguments: 
+                        // OpenOrCreate to be robust to the file existing or not
+                        // None to take an exclusive lock
+                        // DeleteOnClose to clean up after ourselves
+                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1);
+                        try
+                        {
+                            lockFileStream.WriteByte(0);
+                            lockFileStream.Lock(0, 1);
+                        } catch (UnauthorizedAccessException)
+                        {
+                            return false;
+                        } catch (IOException)
+                        {
+                            return false;
+                        }
                     }
-                }
-                catch (AbandonedMutexException)
-                {
-                    owned = true;
+                    catch (DirectoryNotFoundException)
+                    {
+                        // this should almost never happen because we just created the directory but in a race condition it could. Just retry
+                        continue;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        // This can happen in few cases:
+
+                        // The path is already directory, so we'll never be able to open a handle of it as a file
+                        if (Directory.Exists(name))
+                        {
+                            throw new InvalidOperationException($"Failed to create lock file '{name}' because it is already the name of a directory");
+                        }
+
+                        // The file exists and is read-only
+                        FileAttributes attributes;
+                        try { attributes = File.GetAttributes(name); }
+                        catch { attributes = FileAttributes.Normal; } // e. g. could fail with FileNotFoundException
+                        if (attributes.HasFlag(FileAttributes.ReadOnly))
+                        {
+                            // We could support this by eschewing DeleteOnClose once we detect that a file is read-only,
+                            // but absent interest or a use-case we'll just throw for now
+                            throw new NotSupportedException($"Locking on read-only file '{name}' is not supported");
+                        }
+
+                        // Frustratingly, this error can be thrown transiently due to concurrent creation/deletion. Initially assume
+                        // that it is transient and just retry
+                        if (CanRetryTransientFileSystemError(ref retryCount))
+                        {
+                            continue;
+                        }
+
+                        // If we get here, we've exhausted our retries: assume that it is a legitimate permissions issue
+                        throw;
+                    }
+                    // this should never happen because we validate. However if it does (e. g. due to some system configuration change?), throw so that
+                    // this doesn't end up in the IOException block (PathTooLongException is IOException)
+                    catch (PathTooLongException) { throw; }
+                    catch (IOException)
+                    {
+                        // the hope is that if we get here the only failure reason would be that the file is locked
+                        return false;
+                    }
+
+                    LockFileStream = lockFileStream;
                     return true;
                 }
-
-                return false;
             }
-            else
+            else // Unix, use flock
             {
                 int file = -1;
                 try
@@ -453,12 +552,17 @@ public class AsyncMutexLock
         {
             if (IsWindows)
             {
-                if (owned)
+                var file = Interlocked.Exchange(ref this.LockFileStream, null);
+                if (file != null)
                 {
-                    mutex?.ReleaseMutex();
-                    mutex?.Dispose();
-                    mutex = null;
-                    owned = false;
+                    try
+                    {
+                        file.Unlock(0, 1);
+                        file.Close();
+                        file.Dispose();
+                    }
+                    catch (UnauthorizedAccessException) { }
+                    catch (IOException) { }
                 }
             }
             else
@@ -627,23 +731,6 @@ public class AsyncMutexLock
                     }, TaskScheduler.Default);
             }, TaskScheduler.Default).Unwrap();
     }
-    public Task<IDisposable> TryLockAsync(TimeSpan timeout)
-    {
-        var @lock = new InnerLock(this, _asyncId.Value, ThreadId);
-        _asyncId.Value = Interlocked.Increment(ref AsyncMutexLock.AsyncStackCounter);
-
-        return @lock.TryObtainLockAsync(timeout)
-            .ContinueWith(state =>
-            {
-                if (state.Exception is AggregateException ex)
-                {
-                    ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
-                }
-                var disposableLock = state.Result;
-                if (disposableLock is null) throw new TimeoutException("TryLockAsync timed out.");
-                return disposableLock;
-            }, TaskScheduler.Default);
-    }
 
     // Make sure InnerLock.TryLockAsync() does not use await, because an async function triggers a snapshot of
     // the AsyncLocal value.
@@ -711,26 +798,7 @@ public class AsyncMutexLock
                     }, TaskScheduler.Default);
             }, TaskScheduler.Default).Unwrap();
     }
-    public Task<IDisposable> TryLockAsync(CancellationToken cancellationToken = default)
-    {
-        var @lock = new InnerLock(this, _asyncId.Value, ThreadId);
-        _asyncId.Value = Interlocked.Increment(ref AsyncMutexLock.AsyncStackCounter);
 
-        return @lock.TryObtainLockAsync(cancellationToken)
-            .ContinueWith(state =>
-            {
-                if (state.Exception is AggregateException ex)
-                {
-                    ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
-                }
-                var disposableLock = state.Result;
-                if (disposableLock is null)
-                {
-                    throw new TimeoutException("TryLockAsync timed out.");
-                }
-                return disposableLock;
-            }, TaskScheduler.Default);
-    }
     public IDisposable Lock(CancellationToken cancellationToken = default)
     {
         var @lock = new InnerLock(this, _asyncId.Value, ThreadId);
@@ -763,7 +831,26 @@ public class AsyncMutexLock
         }
         return true;
     }
-    public IDisposable TryLock(TimeSpan timeout)
+
+    public Task<IDisposable> LockAsync(TimeSpan timeout)
+    {
+        var @lock = new InnerLock(this, _asyncId.Value, ThreadId);
+        _asyncId.Value = Interlocked.Increment(ref AsyncMutexLock.AsyncStackCounter);
+
+        return @lock.TryObtainLockAsync(timeout)
+            .ContinueWith(state =>
+            {
+                if (state.Exception is AggregateException ex)
+                {
+                    ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
+                }
+                var disposableLock = state.Result;
+                if (disposableLock is null) throw new TimeoutException("LockAsync timed out.");
+                return disposableLock;
+            });
+    }
+
+    public IDisposable Lock(TimeSpan timeout)
     {
         var @lock = new InnerLock(this, _asyncId.Value, ThreadId);
         // Increment the async stack counter to prevent a child task from getting
@@ -773,6 +860,7 @@ public class AsyncMutexLock
         if (lockDisposable is null) throw new TimeoutException("TryLock timed out.");
         return lockDisposable;
     }
+
     [DllImport("libc")]
     public static extern uint getuid();
 
@@ -780,11 +868,11 @@ public class AsyncMutexLock
 
     private string NormalizeName(string name)
     {
-        if (IsWindows) return $"Global\\{name.Replace('/', '_')}";
-        if (IsLinux && UnixIsRoot) return $"/run/aspnet-server/{name}.lock";
+        //if (IsWindows) return $"Global\\{name.Replace('/', '_')}";
+        if (IsLinux && UnixIsRoot) return $"/run/asyncmutexlock/{name}.lock";
         
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var lockpath = Path.Combine(appData, "aspnet-server");
+        var lockpath = Path.Combine(appData, "asyncmutexlock");
         var lockfile = Path.Combine(lockpath, $"{name}.lock");
         Directory.CreateDirectory(lockpath);
         return lockfile;

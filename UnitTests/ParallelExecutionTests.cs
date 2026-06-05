@@ -20,7 +20,7 @@ namespace AsyncLockTests
         [TestMethod]
         public async Task ParallelExecution()
         {
-            await Task.WhenAll(Enumerable.Range(0, 1).Select(SomeMethod));
+            await Task.WhenAll(Enumerable.Range(0, 3).Select(SomeMethod));
         }
 
         private static async Task SomeMethod(int i)
