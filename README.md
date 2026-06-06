@@ -70,7 +70,7 @@ private class AsyncLockTest
 }
 ```
 
-# Async Global Mutex
+## Async Global Mutex
 The class `AsyncMutexLock` works exactly like `AsyncLock`, except that it uses a cross process machine wide file lock.
 It can be used as an async friendly version of a global Mutex. For this, you create a named lock by calling the constructor
 `AsyncMutexLock("MyMutexName")`. You can then synchronize proecesses using this global lock.
