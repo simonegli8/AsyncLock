@@ -6,7 +6,7 @@
     <PackageId>NeoSmart.AsyncLock</PackageId>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Version>3.3.0-preview1</Version>
-    <Authors>Simon Egli, NeoSmart Technologies, Mahmoud Al-Qudsi</Authors>
+    <Authors>NeoSmart Technologies, Mahmoud Al-Qudsi</Authors>
     <Company>NeoSmart Technologies</Company>
     <Product>NeoSmart.AsyncLock</Product>
     <Description>A C# lock replacement for async/await, supporting recursion/re-entrance and asynchronous waits. Handles async recursion correctly - note that Nito.AsyncEx does not!</Description>
