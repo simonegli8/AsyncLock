@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace EstrellasDeEsperanza.AsyncLock;
+namespace NeoSmart.AsyncLock;
 
 
 public class AsyncMutexLock
