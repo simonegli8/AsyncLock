@@ -96,12 +96,12 @@ namespace AsyncLockTests
 
             var unlockTask = Task.Run(async () =>
             {
-                    await eventTestThreadStarted.WaitAsync();
-                    eventSleepNotStarted.Release();
-                    Thread.Sleep(unlockDelayMs);
-                    await eventAboutToWait.WaitAsync();
-                    Interlocked.Increment(ref step);
-                    locked.Dispose();
+                await eventTestThreadStarted.WaitAsync();
+                eventSleepNotStarted.Release();
+                Thread.Sleep(unlockDelayMs);
+                await eventAboutToWait.WaitAsync();
+                Interlocked.Increment(ref step);
+                locked.Dispose();
             });
             
             var testThread = new Thread(async () =>
