@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 
 namespace NeoSmart.AsyncLock
 {
-
     public class AsyncLock
     {
         private SemaphoreSlim _reentrancy = new SemaphoreSlim(1, 1);
