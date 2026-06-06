@@ -541,7 +541,6 @@ public class AsyncMutexLock
                     FileStream lockFileStream;
                     try
                     {
-
                         // key arguments: 
                         // OpenOrCreate to be robust to the file existing or not
                         // DeleteOnClose to clean up after ourselves
@@ -549,13 +548,14 @@ public class AsyncMutexLock
                         try
                         {
                             lockFileStream.WriteByte(0);
+                            lockFileStream.Flush();
                             lockFileStream.Lock(0, 1);
                         }
-                        catch (UnauthorizedAccessException)
+                        catch (UnauthorizedAccessException ex)
                         {
                             return false;
                         }
-                        catch (IOException)
+                        catch (IOException ex)
                         {
                             return false;
                         }
@@ -606,6 +606,7 @@ public class AsyncMutexLock
                     }
 
                     LockFileStream = lockFileStream;
+                    AppDomain.CurrentDomain.ProcessExit += MutexRelease;
                     return true;
                 }
             }
@@ -639,7 +640,7 @@ public class AsyncMutexLock
             }
         }
 
-        public void MutexRelease()
+        public void MutexRelease(object? sender = null, EventArgs? args = default)
         {
             if (IsWindows)
             {
@@ -651,6 +652,7 @@ public class AsyncMutexLock
                         file.Unlock(0, 1);
                         file.Close();
                         file.Dispose();
+                        AppDomain.CurrentDomain.ProcessExit -= MutexRelease;
                     }
                     catch (UnauthorizedAccessException) { }
                     catch (IOException) { }

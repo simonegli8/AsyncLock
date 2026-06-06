@@ -3,11 +3,11 @@
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
     <RootNamespace>NeoSmart.AsyncLock</RootNamespace>
-    <PackageId>NeoSmart.AsyncLock</PackageId>
+    <PackageId>EstrellasDeEsperanza.AsyncLock</PackageId>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Version>3.3.0-preview1</Version>
-    <Authors>NeoSmart Technologies, Mahmoud Al-Qudsi</Authors>
-    <Company>NeoSmart Technologies</Company>
+    <Authors>Simon Egli, NeoSmart Technologies, Mahmoud Al-Qudsi</Authors>
+    <Company>Estrellas de Esperanza</Company>
     <Product>NeoSmart.AsyncLock</Product>
     <Description>A C# lock replacement for async/await, supporting recursion/re-entrance and asynchronous waits. Handles async recursion correctly - note that Nito.AsyncEx does not!</Description>
     <Copyright>Copyright NeoSmart Technologies 2017-2025</Copyright>
