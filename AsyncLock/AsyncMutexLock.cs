@@ -759,6 +759,7 @@ public class AsyncMutexLock: IDisposable
     }
 
     public void Dispose() => MutexRelease();
+    ~AsyncMutexLock() => Dispose();
 
     // Make sure InnerLock.LockAsync() does not use await, because an async function triggers a snapshot of
     // the AsyncLocal value.
