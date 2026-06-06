@@ -1,16 +1,12 @@
-﻿#if !NETSTANDARD1_3
-
-using NeoSmart.AsyncLock;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 
-namespace NeoSmart.AsyncLock;
+namespace EstrellasDeEsperanza.AsyncLock;
 
 
 public class AsyncMutexLock
@@ -110,7 +106,9 @@ public class AsyncMutexLock
                         {
                             break;
                         }
-                    } catch {
+                    }
+                    catch
+                    {
                         _parent._owningThreadId = oldThreadId;
                         // we need to release retry here, since changing owningThreadId before we actually aquire the lock
                         // might cause other threads to wait on retry. It does not hurt if we release retry too much. 
@@ -199,7 +197,8 @@ public class AsyncMutexLock
                                 {
                                     break;
                                 }
-                            } catch 
+                            }
+                            catch
                             {
                                 _parent._owningThreadId = oldThreadId;
                                 // we need to release retry here, since changing owningThreadId before we actually aquire the lock
@@ -309,7 +308,8 @@ public class AsyncMutexLock
                         try
                         {
                             if (TryMutexAcquireOnce()) break;
-                        } catch
+                        }
+                        catch
                         {
                             _parent._owningThreadId = oldThreadId;
                             // we need to release retry here, since changing owningThreadId before we actually aquire the lock
@@ -324,7 +324,8 @@ public class AsyncMutexLock
                         _parent._reentrancy.Release();
                         await Task.Delay(pollMilliseconds, cancellationToken).ConfigureAwait(false); ;
                     }
-                } catch
+                }
+                catch
                 {
                     return null;
                 }
@@ -363,13 +364,14 @@ public class AsyncMutexLock
                         {
                             break;
                         }
-                    } catch
+                    }
+                    catch
                     {
                         _parent._reentrancy.Release();
                         throw;
                     }
                     _parent._reentrancy.Release();
-                    
+
                     Thread.Sleep(pollMilliseconds);
                     cancellationToken.ThrowIfCancellationRequested();
                 }
@@ -405,7 +407,7 @@ public class AsyncMutexLock
             while (remainder > TimeSpan.Zero)
             {
                 if (!_parent._reentrancy.Wait(remainder)) return null;
-  
+
                 now = DateTimeOffset.UtcNow;
                 remainder -= now - last;
                 last = now;
@@ -426,7 +428,8 @@ public class AsyncMutexLock
                                     break;
                                 }
                             }
-                            catch {
+                            catch
+                            {
                                 _parent._reentrancy.Release();
                                 throw;
                             }
@@ -546,7 +549,10 @@ public class AsyncMutexLock
                         // key arguments: 
                         // OpenOrCreate to be robust to the file existing or not
                         // DeleteOnClose to clean up after ourselves
-                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1);
+#if NETSTANDARD1_3
+                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, bufferSize: 1, FileOptions.DeleteOnClose);
+#else
+                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1, FileOptions.DeleteOnClose);
                         try
                         {
                             lockFileStream.WriteByte(0);
@@ -561,6 +567,7 @@ public class AsyncMutexLock
                         {
                             return false;
                         }
+#endif
                     }
                     catch (DirectoryNotFoundException)
                     {
@@ -608,7 +615,9 @@ public class AsyncMutexLock
                     }
 
                     LockFileStream = lockFileStream;
+#if !NETSTANDARD1_3
                     AppDomain.CurrentDomain.ProcessExit += MutexRelease;
+#endif      
                     return true;
                 }
             }
@@ -646,15 +655,19 @@ public class AsyncMutexLock
         {
             if (IsWindows)
             {
-                var file = Interlocked.Exchange(ref this.LockFileStream, null);
+                var file = Interlocked.Exchange(ref this.LockFileStream!, null);
                 if (file != null)
                 {
                     try
                     {
+#if !NETSTANDARD1_3
                         file.Unlock(0, 1);
                         file.Close();
                         file.Dispose();
                         AppDomain.CurrentDomain.ProcessExit -= MutexRelease;
+#else
+                        file.Dispose();
+#endif
                     }
                     catch (UnauthorizedAccessException) { }
                     catch (IOException) { }
@@ -969,6 +982,9 @@ public class AsyncMutexLock
 
     private string NormalizeName(string name)
     {
+#if NETSTANDARD1_3
+        return name;
+#else
         //if (IsWindows) return $"Global\\{name.Replace('/', '_')}";
         if (IsLinux && UnixIsRoot) return $"/run/asyncmutexlock/{name}.lock";
 
@@ -977,6 +993,6 @@ public class AsyncMutexLock
         var lockfile = Path.Combine(lockpath, $"{name}.lock");
         Directory.CreateDirectory(lockpath);
         return lockfile;
+#endif
     }
 }
-#endif
