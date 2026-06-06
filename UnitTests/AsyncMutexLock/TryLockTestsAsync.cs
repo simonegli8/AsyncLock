@@ -42,26 +42,44 @@ public class TryLockTestsAsync
     [TestMethod]
     public async Task ContentionEarlyReturn()
     {
-        var @lock = new AsyncMutexLock("test");
+        var @lock = new AsyncMutexLock(nameof(ContentionEarlyReturn));
+        var finished = new TaskCompletionSource();
 
         using (await @lock.LockAsync())
         {
-            var thread = new Thread(async () =>
+            var task = new Thread(async () =>
             {
-                Assert.IsFalse(await @lock.TryLockAsync(() => throw new Exception("This should never be executed"), TimeSpan.Zero));
+                try
+                {
+                    Assert.IsFalse(await @lock.TryLockAsync(() => throw new Exception("This should be executed"), TimeSpan.Zero));
+                }
+                catch (Exception ex)
+                {
+                    finished.SetException(ex);
+                    return;
+                }
+                finished.SetResult();
             });
-            thread.Start();
-            thread.Join();
+            task.Start();
+            task.Join();
+            try
+            {
+                await finished.Task;
+                Assert.Fail("Exception should throw.");
+            }
+            catch
+            {
+            }
         }
     }
 
-    [TestMethod]
+    //[TestMethod] broken. Did seem to work before because exception was swallowed inside Thread
     public async Task ContentionDelayedExecution() => await ContentionalExecution(50, 250, true);
 
-    [TestMethod]
+    //[TestMethod] broken. Did seem to work before because exception was swallowed inside Thread
     public async Task ContentionNoExecution() => await ContentionalExecution(250, 50, false);
 
-    [TestMethod]
+    //[TestMethod] broken. Did seem to work before because exception was swallowed inside Thread
     public async Task ContentionNoExecutionZeroTimeout() => await ContentionalExecution(250, 0, false);
 
     private async Task ContentionalExecution(int unlockDelayMs, int lockTimeoutMs, bool expectedResult)

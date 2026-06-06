@@ -15,11 +15,11 @@ namespace AsyncLockTests
         public TaskWaiter(Task task)
             : base(false, EventResetMode.ManualReset)
         {
-            new Thread(async () =>
+            Task.Run(async () =>
             {
                 await task;
                 Set();
-            }).Start();
+            });
         }
     }
 }

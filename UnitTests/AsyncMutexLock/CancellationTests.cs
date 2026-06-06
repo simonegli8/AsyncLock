@@ -16,7 +16,7 @@ public class CancellationTests
     [TestMethod]
     public void CancellingWait()
     {
-        var @lock = new AsyncMutexLock("test");
+        var @lock = new AsyncMutexLock(nameof(CancellationTests));
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         Task.Run(async () =>
         {

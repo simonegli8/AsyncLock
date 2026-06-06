@@ -26,7 +26,7 @@ public class MixedSyncAsyncTimed
         var count = 0;
         var threads = new List<Thread>(10);
         var tasks = new List<Task>(10);
-        var asyncLock = new AsyncMutexLock("text");
+        var asyncLock = new AsyncMutexLock(nameof(MixedSyncAsyncTimed));
         var rng = new Random();
 
         {

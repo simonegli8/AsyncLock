@@ -27,7 +27,7 @@ public class MixedSyncAsync
         int count = 0, nsync = 0, nasync = 0; 
         var threads = new List<Thread>(10);
         var tasks = new List<Task>(10);
-        var asyncLock = new AsyncMutexLock("test");
+        var asyncLock = new AsyncMutexLock(nameof(MixedSyncAsync));
         var rng = new Random();
         var start = DateTime.UtcNow;
 
