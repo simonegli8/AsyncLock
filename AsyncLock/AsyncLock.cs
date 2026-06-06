@@ -43,7 +43,7 @@ namespace NeoSmart.AsyncLock
         }
 
 #if !DEBUG
-    readonly
+        readonly
 #endif
         struct InnerLock : IDisposable
         {
