@@ -550,9 +550,9 @@ public class AsyncMutexLock
                         // OpenOrCreate to be robust to the file existing or not
                         // DeleteOnClose to clean up after ourselves
 #if NETSTANDARD1_3
-                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, bufferSize: 1, FileOptions.DeleteOnClose);
+                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, bufferSize: 1);
 #else
-                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1, FileOptions.DeleteOnClose);
+                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1);
                         try
                         {
                             lockFileStream.WriteByte(0);
@@ -664,6 +664,15 @@ public class AsyncMutexLock
                         file.Unlock(0, 1);
                         file.Close();
                         file.Dispose();
+                        var nameToDelete = name;
+                        Task.Run(() =>
+                        {
+                            try
+                            {
+                                File.Delete(nameToDelete);
+                            }
+                            catch { }
+                        });
                         AppDomain.CurrentDomain.ProcessExit -= MutexRelease;
 #else
                         file.Dispose();
