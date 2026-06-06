@@ -1,6 +1,6 @@
 ## AsyncLock: An async/await-friendly lock
 
-[![NuGet](https://img.shields.io/nuget/v/NeoSmart.AsyncLock.svg)](https://www.nuget.org/packages/NeoSmart.AsyncLock)
+[![NuGet](https://img.shields.io/nuget/v/EstrellasDeEsperanza.AsyncLock.svg)](https://www.nuget.org/packages/EstrellasDeEsperanza.AsyncLock)
 
 AsyncLock is an async/await-friendly lock implementation for .NET Standard, making writing code like the snippet below (mostly) possible:
 

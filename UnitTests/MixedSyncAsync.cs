@@ -1,5 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NeoSmart.AsyncLock;
+using EstrellasDeEsperanza.AsyncLock;
 using System;
 using System.Collections.Generic;
 using System.Linq;

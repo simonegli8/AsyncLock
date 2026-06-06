@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/Scripts/">
+    <File Path="CreatePackages.bat" />
+    <File Path="PushToNuget.bat" />
+  </Folder>
   <Project Path="AsyncLock/AsyncLock.csproj" />
   <Project Path="UnitTests/UnitTests.csproj" />
 </Solution>

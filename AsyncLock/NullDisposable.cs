@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace NeoSmart.AsyncLock
+namespace EstrellasDeEsperanza.AsyncLock
 {
     sealed class NullDisposable : IDisposable
     {

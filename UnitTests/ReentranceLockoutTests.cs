@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NeoSmart.AsyncLock;
+using EstrellasDeEsperanza.AsyncLock;
 
 namespace AsyncLockTests
 {

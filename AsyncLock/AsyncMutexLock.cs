@@ -1,6 +1,6 @@
 ﻿#if !NETSTANDARD1_3
 
-using NeoSmart.AsyncLock;
+using EstrellasDeEsperanza.AsyncLock;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -10,7 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace NeoSmart.AsyncLock;
+namespace EstrellasDeEsperanza.AsyncLock;
 
 
 public class AsyncMutexLock
