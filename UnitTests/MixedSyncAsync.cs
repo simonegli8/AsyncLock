@@ -36,15 +36,15 @@ namespace AsyncLockTests
                     {
                         using (asyncLock.Lock())
                         {
-                            Assert.AreEqual(Interlocked.Increment(ref count), 1);
+                            Assert.AreEqual(1, Interlocked.Increment(ref count));
                             Thread.Sleep(rng.Next(1, 10) * 10);
                             using (asyncLock.Lock())
                             {
                                 Thread.Sleep(10);
-                                Assert.AreEqual(Interlocked.Decrement(ref count), 0);
+                                Assert.AreEqual(0, Interlocked.Decrement(ref count));
                             }
 
-                            Assert.AreEqual(count, 0);
+                            Assert.AreEqual(0, count);
                         }
 
                     });
@@ -58,16 +58,16 @@ namespace AsyncLockTests
                     {
                         using (await asyncLock.LockAsync())
                         {
-                            Assert.AreEqual(Interlocked.Increment(ref count), 1);
-                            Assert.AreEqual(count, 1);
+                            Assert.AreEqual(1, Interlocked.Increment(ref count));
+                            Assert.AreEqual(1, count);
                             await Task.Delay(rng.Next(1, 10) * 10);
                             using (await asyncLock.LockAsync())
                             {
                                 await Task.Delay(10);
-                                Assert.AreEqual(Interlocked.Decrement(ref count), 0);
+                                Assert.AreEqual(0, Interlocked.Decrement(ref count));
                             }
 
-                            Assert.AreEqual(count, 0);
+                            Assert.AreEqual(0, count);
                         }
 
                     });

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AsyncLockTests;
+using System.Diagnostics;
 
 namespace AsyncLockTests.Mutex;
 
@@ -23,7 +24,7 @@ public class MixedSyncAsync
     [TestMethod]
     public async Task MixedSyncAsyncExecution()
     {
-        var count = 0;
+        int count = 0, nsync = 0, nasync = 0; 
         var threads = new List<Thread>(10);
         var tasks = new List<Task>(10);
         var asyncLock = new AsyncMutexLock("test");
@@ -31,30 +32,32 @@ public class MixedSyncAsync
         var start = DateTime.UtcNow;
 
         {
-            using var l = asyncLock.Lock();
+            //using var l = asyncLock.Lock();
             for (int i = 0; i < 10; ++i)
             {
                 var thread = new Thread(() =>
                 {
+                    var id = Interlocked.Increment(ref nsync);
+                    Debug.WriteLine($"Sync Thread: {id}; Sync Thread ID: {Thread.CurrentThread.ManagedThreadId}");
                     var t0 = DateTime.UtcNow;
                     using (asyncLock.Lock())
                     {
                         var time = DateTime.UtcNow - t0;
-                        Console.WriteLine($"SyncLock1: {time}");
+                        Debug.WriteLine($"SyncLock{id}.1: {time}");
 
-                        Assert.AreEqual(Interlocked.Increment(ref count), 1);
+                        Assert.AreEqual(1, Interlocked.Increment(ref count));
                         Thread.Sleep(rng.Next(1, 10) * 10);
                         t0 = DateTime.UtcNow;
                         using (asyncLock.Lock())
                         {
                             time = DateTime.UtcNow - t0;
-                            Console.WriteLine($"SyncLock2: {time}");
+                            Debug.WriteLine($"SyncLock{id}.2: {time}");
 
                             Thread.Sleep(10);
-                            Assert.AreEqual(Interlocked.Decrement(ref count), 0);
+                            Assert.AreEqual(0, Interlocked.Decrement(ref count));
                         }
 
-                        Assert.AreEqual(count, 0);
+                        Assert.AreEqual(0, count);
                     }
 
                 });
@@ -66,25 +69,28 @@ public class MixedSyncAsync
             {
                 var task = Task.Run(async () =>
                 {
+                    var id = Interlocked.Increment(ref nasync);
+                    Debug.WriteLine($"Async Thread: {id}; Async Thread ID: {Thread.CurrentThread.ManagedThreadId}");
+
                     var t0 = DateTime.UtcNow;
                     using (await asyncLock.LockAsync())
                     {
                         var time = DateTime.UtcNow - t0;
-                        Console.WriteLine($"AsyncLock1: {time}");
+                        Debug.WriteLine($"AsyncLock{id}.1: {time}");
 
-                        Assert.AreEqual(Interlocked.Increment(ref count), 1);
-                        Assert.AreEqual(count, 1);
+                        Assert.AreEqual(1, Interlocked.Increment(ref count));
+                        Assert.AreEqual(1, count);
                         await Task.Delay(rng.Next(1, 10) * 10);
                         t0 = DateTime.UtcNow;
                         using (await asyncLock.LockAsync())
                         {
                             time = DateTime.UtcNow - t0;
-                            Console.WriteLine($"AsyncLock2: {time}");
+                            Debug.WriteLine($"AsyncLock{id}.2: {time}");
                             await Task.Delay(10);
-                            Assert.AreEqual(Interlocked.Decrement(ref count), 0);
+                            Assert.AreEqual(0, Interlocked.Decrement(ref count));
                         }
 
-                        Assert.AreEqual(count, 0);
+                        Assert.AreEqual(0, count);
                     }
 
                 });

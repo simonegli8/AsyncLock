@@ -92,6 +92,9 @@ public class AsyncMutexLock
                 await waitTask;
             }
 
+            var oldThreadId = _parent._owningThreadId;
+            _parent._owningThreadId = ThreadId;
+
             if (_parent._reentrances == 1) // Poll for mutex
             {
                 _parent._reentrancy.Release();
@@ -99,13 +102,25 @@ public class AsyncMutexLock
                 while (true)
                 {
                     await _parent._reentrancy.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    if (TryMutexAcquireOnce())
+                    try
                     {
-                        break;
+                        if (TryMutexAcquireOnce())
+                        {
+                            break;
+                        }
+                    } catch {
+                        _parent._owningThreadId = oldThreadId;
+                        // we need to release retry here, since changing owningThreadId before we actually aquire the lock
+                        // might cause other threads to wait on retry. It does not hurt if we release retry too much. 
+                        if (_parent._retry.CurrentCount == 0)
+                        {
+                            _parent._retry.Release();
+                        }
+                        _parent._reentrancy.Release();
+                        throw;
                     }
-                    var waitTask = Task.Delay(pollMilliseconds, cancellationToken).ConfigureAwait(false);
                     _parent._reentrancy.Release();
-                    await waitTask;
+                    await Task.Delay(pollMilliseconds, cancellationToken).ConfigureAwait(false);
                 }
             }
 
@@ -124,11 +139,19 @@ public class AsyncMutexLock
                 {
                     // Reset the owning thread id after all await calls have finished, otherwise we
                     // could be resumed on a different thread and set an incorrect value.
-                    _parent._owningThreadId = ThreadId;
-                    if (_parent._reentrances != 1 || TryMutexAcquireOnce())
+                    try
+                    {
+                        if (_parent._reentrances != 1 || TryMutexAcquireOnce())
+                        {
+                            _parent._owningThreadId = ThreadId;
+                            _parent._reentrancy.Release();
+                            return this;
+                        }
+                    }
+                    catch (Exception)
                     {
                         _parent._reentrancy.Release();
-                        return this;
+                        throw;
                     }
                 }
                 _parent._reentrancy.Release();
@@ -145,16 +168,46 @@ public class AsyncMutexLock
                 if (!await _parent._reentrancy.WaitAsync(remainder).ConfigureAwait(false)) return null;
                 if (InnerTryEnter(synchronous: false))
                 {
+                    var oldThreadId = _parent._owningThreadId;
+                    _parent._owningThreadId = ThreadId;
+
                     if (_parent._reentrances == 1) // Poll for mutex
                     {
                         _parent._reentrancy.Release();
 
+                        Task<bool>? reentrancyLock = null;
                         while (remainder > TimeSpan.Zero)
                         {
-                            if (!await _parent._reentrancy.WaitAsync(remainder).ConfigureAwait(false)) return null;
-                            if (TryMutexAcquireOnce())
+                            if (!await (reentrancyLock = _parent._reentrancy.WaitAsync(remainder)).ConfigureAwait(false))
                             {
-                                break;
+                                await _parent._reentrancy.WaitAsync();
+                                _parent._owningThreadId = oldThreadId;
+                                // we need to release retry here, since changing owningThreadId before we actually aquire the lock
+                                // might cause other threads to wait on retry. It does not hurt if we release retry too much. 
+                                if (_parent._retry.CurrentCount == 0)
+                                {
+                                    _parent._retry.Release();
+                                }
+                                _parent._reentrancy.Release();
+                                return null;
+                            }
+                            try
+                            {
+                                if (TryMutexAcquireOnce())
+                                {
+                                    break;
+                                }
+                            } catch 
+                            {
+                                _parent._owningThreadId = oldThreadId;
+                                // we need to release retry here, since changing owningThreadId before we actually aquire the lock
+                                // might cause other threads to wait on retry. It does not hurt if we release retry too much. 
+                                if (_parent._retry.CurrentCount == 0)
+                                {
+                                    _parent._retry.Release();
+                                }
+                                _parent._reentrancy.Release();
+                                throw;
                             }
 
                             _parent._reentrancy.Release();
@@ -162,8 +215,8 @@ public class AsyncMutexLock
                             now = DateTimeOffset.UtcNow;
                             remainder -= now - last;
                             last = now;
-                            var poll = Math.Min(pollMilliseconds, remainder.Milliseconds);
-                            if (poll > 0) Thread.Sleep(poll);
+                            var poll = TimeSpan.FromTicks(Math.Min(pollTimeSpan.Ticks, remainder.Ticks));
+                            if (poll > TimeSpan.Zero) Thread.Sleep(poll);
 
                             now = DateTimeOffset.UtcNow;
                             remainder -= now - last;
@@ -181,11 +234,17 @@ public class AsyncMutexLock
                     }
                     else
                     {
+                        _parent._owningThreadId = oldThreadId;
+                        // we need to release retry here, since changing owningThreadId before we actually aquire the lock
+                        // might cause other threads to wait on retry. It does not hurt if we release retry too much.
+                        if (_parent._retry.CurrentCount == 0)
+                        {
+                            _parent._retry.Release();
+                        }
                         _parent._reentrancy.Release();
                         return null;
                     }
                 }
-                // BUG? _parent._reentrancy.Release();
 
                 now = DateTimeOffset.UtcNow;
                 remainder -= now - last;
@@ -233,6 +292,9 @@ public class AsyncMutexLock
                 return null;
             }
 
+            var oldThreadId = _parent._owningThreadId;
+            _parent._owningThreadId = ThreadId;
+
             if (_parent._reentrances == 1) // Poll for mutex
             {
                 _parent._reentrancy.Release();
@@ -242,21 +304,32 @@ public class AsyncMutexLock
                     while (true)
                     {
                         await _parent._reentrancy.WaitAsync(cancellationToken).ConfigureAwait(false);
-                        if (TryMutexAcquireOnce()) break;
-                        
-                        var waitTask = Task.Delay(pollMilliseconds, cancellationToken).ConfigureAwait(false);
+                        try
+                        {
+                            if (TryMutexAcquireOnce()) break;
+                        } catch
+                        {
+                            _parent._owningThreadId = oldThreadId;
+                            // we need to release retry here, since changing owningThreadId before we actually aquire the lock
+                            // might cause other threads to wait on retry. It does not hurt if we release retry too much. 
+                            if (_parent._retry.CurrentCount == 0)
+                            {
+                                _parent._retry.Release();
+                            }
+                            _parent._reentrancy.Release();
+                            throw;
+                        }
                         _parent._reentrancy.Release();
-                        await waitTask;
+                        await Task.Delay(pollMilliseconds, cancellationToken).ConfigureAwait(false); ;
                     }
-                }
-                catch (OperationCanceledException)
+                } catch
                 {
                     return null;
                 }
-
-                _parent._owningThreadId = ThreadId;
-                _parent._reentrancy.Release();
             }
+            _parent._owningThreadId = ThreadId;
+            _parent._reentrancy.Release();
+
             return this;
         }
 
@@ -270,11 +343,9 @@ public class AsyncMutexLock
                     break;
                 }
                 // We need to wait for someone to leave the lock before trying again.
-                var waitTask = _parent._retry.WaitAsync(cancellationToken);
+
                 _parent._reentrancy.Release();
-                // This should be safe since the task we are awaiting doesn't need to make progress
-                // itself to complete - it will be completed by another thread altogether. cf SemaphoreSlim internals.
-                waitTask.GetAwaiter().GetResult();
+                _parent._retry.Wait(cancellationToken);
             }
 
             if (_parent._reentrances == 1) // Poll for mutex
@@ -284,15 +355,21 @@ public class AsyncMutexLock
                 while (true)
                 {
                     _parent._reentrancy.Wait(cancellationToken);
-                    if (TryMutexAcquireOnce())
+                    try
                     {
-                        break;
+                        if (TryMutexAcquireOnce())
+                        {
+                            break;
+                        }
+                    } catch
+                    {
+                        _parent._reentrancy.Release();
+                        throw;
                     }
-                    var waitTask = Task.Delay(pollMilliseconds, cancellationToken);
                     _parent._reentrancy.Release();
-                    // This should be safe since the task we are awaiting doesn't need to make progress
-                    // itself to complete - it will be completed by another thread altogether. cf SemaphoreSlim internals.
-                    waitTask.GetAwaiter().GetResult();
+                    
+                    Thread.Sleep(pollMilliseconds);
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
             }
 
@@ -326,6 +403,11 @@ public class AsyncMutexLock
             while (remainder > TimeSpan.Zero)
             {
                 if (!_parent._reentrancy.Wait(remainder)) return null;
+  
+                now = DateTimeOffset.UtcNow;
+                remainder -= now - last;
+                last = now;
+
                 if (InnerTryEnter(synchronous: true))
                 {
                     if (_parent._reentrances == 1) // Poll for mutex
@@ -335,9 +417,16 @@ public class AsyncMutexLock
                         while (remainder > TimeSpan.Zero)
                         {
                             if (!_parent._reentrancy.Wait(remainder)) return null;
-                            if (TryMutexAcquireOnce())
+                            try
                             {
-                                break;
+                                if (TryMutexAcquireOnce())
+                                {
+                                    break;
+                                }
+                            }
+                            catch {
+                                _parent._reentrancy.Release();
+                                throw;
                             }
 
                             _parent._reentrancy.Release();
@@ -345,8 +434,8 @@ public class AsyncMutexLock
                             now = DateTimeOffset.UtcNow;
                             remainder -= now - last;
                             last = now;
-                            var poll = Math.Min(pollMilliseconds, remainder.Milliseconds);
-                            if (poll > 0) Thread.Sleep(poll);
+                            var poll = TimeSpan.FromTicks(Math.Min(pollTimeSpan.Ticks, remainder.Ticks));
+                            if (poll > TimeSpan.Zero) Thread.Sleep(poll);
 
                             now = DateTimeOffset.UtcNow;
                             remainder -= now - last;
@@ -355,7 +444,7 @@ public class AsyncMutexLock
 
                         if (remainder <= TimeSpan.Zero) return null;
                     }
-                    
+
                     _parent._reentrancy.Release();
                     return this;
                 }
@@ -364,9 +453,8 @@ public class AsyncMutexLock
                 remainder -= now - last;
                 last = now;
 
-                var waitTask = _parent._retry.WaitAsync(remainder);
                 _parent._reentrancy.Release();
-                if (!waitTask.GetAwaiter().GetResult())
+                if (!_parent._retry.Wait(remainder))
                 {
                     return null;
                 }
@@ -381,7 +469,6 @@ public class AsyncMutexLock
 
         // Mutex code
         FileStream LockFileStream;
-        bool owned = false;
         string name => _parent.name;
         int FlockFile = -1;
 
@@ -392,6 +479,8 @@ public class AsyncMutexLock
         private const int O_RDWR = 0x2;
 
         const int pollMilliseconds = 100;
+        static readonly TimeSpan pollTimeSpan = TimeSpan.FromMilliseconds(pollMilliseconds);
+
         [DllImport("libc", SetLastError = true)]
         private static extern int flock(int fd, int operation);
         [DllImport("libc", SetLastError = true)]
@@ -449,24 +538,24 @@ public class AsyncMutexLock
                 {
                     cancel.ThrowIfCancellationRequested();
 
-                    EnsureDirectoryExists();
-
                     FileStream lockFileStream;
                     try
                     {
+
                         // key arguments: 
                         // OpenOrCreate to be robust to the file existing or not
-                        // None to take an exclusive lock
                         // DeleteOnClose to clean up after ourselves
                         lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1);
                         try
                         {
                             lockFileStream.WriteByte(0);
                             lockFileStream.Lock(0, 1);
-                        } catch (UnauthorizedAccessException)
+                        }
+                        catch (UnauthorizedAccessException)
                         {
                             return false;
-                        } catch (IOException)
+                        }
+                        catch (IOException)
                         {
                             return false;
                         }
@@ -525,6 +614,8 @@ public class AsyncMutexLock
                 int file = -1;
                 try
                 {
+                    EnsureDirectoryExists();
+
                     file = open(name, O_CREAT | O_RDWR, 0x1A4); // 0644
 
                     if (file == -1) return false;
@@ -615,6 +706,12 @@ public class AsyncMutexLock
             return true;
         }
 
+        void ReleaseThreadId()
+        {
+            _parent._owningThreadId = _oldThreadId;
+
+        }
+
         public void Dispose()
         {
 #if DEBUG
@@ -637,7 +734,7 @@ public class AsyncMutexLock
                     // only when the lock is fully unlocked.
                     @this._parent._owningId = UnlockedId;
                     @this._parent._owningThreadId = (int)UnlockedId;
-                    
+
                     MutexRelease();
                 }
                 // We can't place this within the _reentrances == 0 block above because we might
@@ -870,7 +967,7 @@ public class AsyncMutexLock
     {
         //if (IsWindows) return $"Global\\{name.Replace('/', '_')}";
         if (IsLinux && UnixIsRoot) return $"/run/asyncmutexlock/{name}.lock";
-        
+
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var lockpath = Path.Combine(appData, "asyncmutexlock");
         var lockfile = Path.Combine(lockpath, $"{name}.lock");
