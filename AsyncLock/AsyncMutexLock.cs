@@ -106,7 +106,9 @@ public class AsyncMutexLock
                         {
                             break;
                         }
-                    } catch {
+                    }
+                    catch
+                    {
                         _parent._owningThreadId = oldThreadId;
                         // we need to release retry here, since changing owningThreadId before we actually aquire the lock
                         // might cause other threads to wait on retry. It does not hurt if we release retry too much. 
@@ -195,7 +197,8 @@ public class AsyncMutexLock
                                 {
                                     break;
                                 }
-                            } catch 
+                            }
+                            catch
                             {
                                 _parent._owningThreadId = oldThreadId;
                                 // we need to release retry here, since changing owningThreadId before we actually aquire the lock
@@ -305,7 +308,8 @@ public class AsyncMutexLock
                         try
                         {
                             if (TryMutexAcquireOnce()) break;
-                        } catch
+                        }
+                        catch
                         {
                             _parent._owningThreadId = oldThreadId;
                             // we need to release retry here, since changing owningThreadId before we actually aquire the lock
@@ -320,7 +324,8 @@ public class AsyncMutexLock
                         _parent._reentrancy.Release();
                         await Task.Delay(pollMilliseconds, cancellationToken).ConfigureAwait(false); ;
                     }
-                } catch
+                }
+                catch
                 {
                     return null;
                 }
@@ -359,13 +364,14 @@ public class AsyncMutexLock
                         {
                             break;
                         }
-                    } catch
+                    }
+                    catch
                     {
                         _parent._reentrancy.Release();
                         throw;
                     }
                     _parent._reentrancy.Release();
-                    
+
                     Thread.Sleep(pollMilliseconds);
                     cancellationToken.ThrowIfCancellationRequested();
                 }
@@ -401,7 +407,7 @@ public class AsyncMutexLock
             while (remainder > TimeSpan.Zero)
             {
                 if (!_parent._reentrancy.Wait(remainder)) return null;
-  
+
                 now = DateTimeOffset.UtcNow;
                 remainder -= now - last;
                 last = now;
@@ -422,7 +428,8 @@ public class AsyncMutexLock
                                     break;
                                 }
                             }
-                            catch {
+                            catch
+                            {
                                 _parent._reentrancy.Release();
                                 throw;
                             }
@@ -543,9 +550,9 @@ public class AsyncMutexLock
                         // OpenOrCreate to be robust to the file existing or not
                         // DeleteOnClose to clean up after ourselves
 #if NETSTANDARD1_3
-                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, bufferSize: 1, FileOptions.DeleteOnClose);
+                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, bufferSize: 1);
 #else
-                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1, FileOptions.DeleteOnClose);
+                        lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1);
                         try
                         {
                             lockFileStream.WriteByte(0);
@@ -657,6 +664,15 @@ public class AsyncMutexLock
                         file.Unlock(0, 1);
                         file.Close();
                         file.Dispose();
+                        var nameToDelete = name;
+                        Task.Run(() =>
+                        {
+                            try
+                            {
+                                File.Delete(nameToDelete);
+                            }
+                            catch { }
+                        });
                         AppDomain.CurrentDomain.ProcessExit -= MutexRelease;
 #else
                         file.Dispose();
