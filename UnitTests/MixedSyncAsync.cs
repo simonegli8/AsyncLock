@@ -81,7 +81,7 @@ namespace AsyncLockTests
                 thread.Join();
             }
 
-            Assert.AreEqual(count, 0);
+            Assert.AreEqual(0, count);
         }
     }
 }
