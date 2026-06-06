@@ -32,9 +32,9 @@ namespace NeoSmart.AsyncLock
         private static long AsyncId => _asyncId.Value;
 
 #if NETSTANDARD1_3
-    private static int ThreadCounter = 0x00;
-    private static ThreadLocal<int> LocalThreadId = new ThreadLocal<int>(() => ++ThreadCounter);
-    private static int ThreadId => LocalThreadId.Value;
+        private static int ThreadCounter = 0x00;
+        private static ThreadLocal<int> LocalThreadId = new ThreadLocal<int>(() => ++ThreadCounter);
+        private static int ThreadId => LocalThreadId.Value;
 #else
         private static int ThreadId => Thread.CurrentThread.ManagedThreadId;
 #endif
