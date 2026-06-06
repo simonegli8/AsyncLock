@@ -41,7 +41,7 @@ namespace AsyncLockTests
                             using (asyncLock.Lock())
                             {
                                 Thread.Sleep(10);
-                                Assert.AreEqual(1, Interlocked.Decrement(ref count));
+                                Assert.AreEqual(0, Interlocked.Decrement(ref count));
                             }
 
                             Assert.AreEqual(0, count);
