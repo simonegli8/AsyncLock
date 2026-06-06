@@ -1,4 +1,6 @@
-﻿using NeoSmart.AsyncLock;
+﻿#if !NETSTANDARD1_3
+
+using NeoSmart.AsyncLock;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -977,3 +979,4 @@ public class AsyncMutexLock
         return lockfile;
     }
 }
+#endif
