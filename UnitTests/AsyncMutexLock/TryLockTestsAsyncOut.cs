@@ -15,7 +15,7 @@ public class TryLockTestsAsyncOut
     [TestMethod]
     public async Task NoContention()
     {
-        var @lock = new AsyncMutexLock("test");
+        using var @lock = new AsyncMutexLock(nameof(TryLockTestsAsyncOut));
 
         Assert.IsTrue(await @lock.TryLockAsync(() => { }, TimeSpan.Zero));
     }
@@ -27,7 +27,7 @@ public class TryLockTestsAsyncOut
     [TestMethod]
     public async Task NoContentionThrows()
     {
-        var @lock = new AsyncMutexLock("test");
+        using var @lock = new AsyncMutexLock(nameof(TryLockTestsAsyncOut));
 
         await Assert.ThrowsExceptionAsync<LocalException>(async () =>
         {
@@ -45,18 +45,17 @@ public class TryLockTestsAsyncOut
     [TestMethod]
     public async Task ContentionEarlyReturn()
     {
-        var @lock = new AsyncMutexLock("test");
+        using var @lock = new AsyncMutexLock(nameof(TryLockTestsAsyncOut));
 
         using (await @lock.LockAsync())
         {
-            var thread = new Thread(async () =>
+            var thread = Task.Run(async () =>
             {
                 await Task.Yield();
                 var disposable = @lock.TryLockAsync(TimeSpan.Zero, out var locked);
                 Assert.IsFalse(locked);
             });
-            thread.Start();
-            thread.Join();
+            await thread;
         }
     }
 
@@ -72,7 +71,7 @@ public class TryLockTestsAsyncOut
     private async Task ContentionalExecution(int unlockDelayMs, int lockTimeoutMs, bool expectedResult)
     {
         int step = 0;
-        var @lock = new AsyncMutexLock("test");
+        using var @lock = new AsyncMutexLock(nameof(TryLockTestsAsyncOut));
 
         var locked = await @lock.LockAsync();
         Interlocked.Increment(ref step);
@@ -81,7 +80,7 @@ public class TryLockTestsAsyncOut
         using var eventSleepNotStarted = new SemaphoreSlim(0, 1);
         using var eventAboutToWait = new SemaphoreSlim(0, 1);
 
-        var unlockThread = new Thread(async () =>
+        var unlockTask = Task.Run(async () =>
         {
             await eventTestThreadStarted.WaitAsync();
             eventSleepNotStarted.Release();
@@ -90,9 +89,8 @@ public class TryLockTestsAsyncOut
             Interlocked.Increment(ref step);
             locked.Dispose();
         });
-        unlockThread.Start();
 
-        var testThread = new Thread(async () =>
+        var testTask = Task.Run(async () =>
         {
             eventTestThreadStarted.Release();
             await eventSleepNotStarted.WaitAsync();
@@ -107,10 +105,9 @@ public class TryLockTestsAsyncOut
 
             }
         });
-        testThread.Start();
 
-        unlockThread.Join();
-        testThread.Join();
+        await unlockTask;
+        await testTask;
     }
 }
 #endif

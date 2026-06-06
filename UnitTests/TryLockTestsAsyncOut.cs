@@ -48,14 +48,13 @@ namespace AsyncLockTests
 
             using (await @lock.LockAsync())
             {
-                var thread = new Thread(async () =>
+                var task = Task.Run(async () =>
                 {
                     await Task.Yield();
                     var disposable = @lock.TryLockAsync(TimeSpan.Zero, out var locked);
                     Assert.IsFalse(locked);
                 });
-                thread.Start();
-                thread.Join();
+                await task;
             }
         }
 
@@ -80,7 +79,7 @@ namespace AsyncLockTests
             using var eventSleepNotStarted = new SemaphoreSlim(0, 1);
             using var eventAboutToWait = new SemaphoreSlim(0, 1);
 
-            var unlockThread = new Thread(async () =>
+            var unlockTask = Task.Run(async () =>
             {
                 await eventTestThreadStarted.WaitAsync();
                 eventSleepNotStarted.Release();
@@ -89,9 +88,8 @@ namespace AsyncLockTests
                 Interlocked.Increment(ref step);
                 locked.Dispose();
             });
-            unlockThread.Start();
 
-            var testThread = new Thread(async () =>
+            var testTask = Task.Run(async () =>
             {
                 eventTestThreadStarted.Release();
                 await eventSleepNotStarted.WaitAsync();
@@ -106,10 +104,9 @@ namespace AsyncLockTests
 
                 }
             });
-            testThread.Start();
 
-            unlockThread.Join();
-            testThread.Join();
+            await unlockTask;
+            await testTask;
         }
     }
 }

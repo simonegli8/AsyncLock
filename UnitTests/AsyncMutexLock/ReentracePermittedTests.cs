@@ -9,7 +9,7 @@ namespace AsyncLockTests.Mutex;
 [TestClass]
 public class ReentracePermittedTests
 {
-    readonly AsyncMutexLock _lock = new AsyncMutexLock("test");
+    readonly AsyncMutexLock _lock = new AsyncMutexLock(nameof(ReentracePermittedTests));
 
     [TestMethod]
     public async Task NestedCallReentrance()

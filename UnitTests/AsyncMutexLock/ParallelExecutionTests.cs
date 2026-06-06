@@ -26,7 +26,7 @@ public class ParallelExecutionTests
 
     private static async Task SomeMethod(int i)
     {
-        var asyncLock = new AsyncMutexLock("test");
+        var asyncLock = new AsyncMutexLock(nameof(ParallelExecution));
         System.Diagnostics.Debug.WriteLine($"Outside {i}");
         await Task.Delay(100);
         using (await asyncLock.LockAsync())

@@ -20,7 +20,7 @@ public class ReentranceLockoutTests
 
     private void ResourceSimulation(Action action)
     {
-        _lock = new AsyncMutexLock("test");
+        _lock = new AsyncMutexLock(nameof(ReentracePermittedTests));
         // Start n threads and have them obtain the lock and randomly wait, then verify
         var failure = new ManualResetEventSlim(false);
         _resource = new LimitedResource(() =>
@@ -74,7 +74,7 @@ public class ReentranceLockoutTests
     {
         ResourceSimulation(() =>
         {
-            var t = new Thread(async () =>
+            var t = Task.Run(async () =>
             {
                 using (await _lock.LockAsync())
                 {
@@ -84,7 +84,6 @@ public class ReentranceLockoutTests
                 }
                 _countdown.Signal();
             });
-            t.Start();
         });
     }
 
@@ -153,7 +152,7 @@ public class ReentranceLockoutTests
     {
         var taskStarted = new SemaphoreSlim(0, 1);
         var taskEnded = new SemaphoreSlim(0, 1);
-        var @lock = new AsyncMutexLock("test");
+        var @lock = new AsyncMutexLock(nameof(ReentracePermittedTests));
         using (await @lock.LockAsync())
         {
             var task = Task.Run(async () =>

@@ -29,7 +29,7 @@ public class AsyncSpawn
     {
         var count = 0;
         var tasks = new List<Task>(70);
-        var asyncLock = new AsyncMutexLock("test");
+        var asyncLock = new AsyncMutexLock(nameof(AsyncSpawn));
         var rng = new Random();
 
         {

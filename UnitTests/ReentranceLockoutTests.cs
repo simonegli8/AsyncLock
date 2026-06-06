@@ -73,7 +73,7 @@ namespace AsyncLockTests
         {
             ResourceSimulation(() =>
             {
-                var t = new Thread(async () =>
+                var t = Task.Run(async () =>
                 {
                     using (await _lock.LockAsync())
                     {
@@ -83,7 +83,6 @@ namespace AsyncLockTests
                     }
                     _countdown.Signal();
                 });
-                t.Start();
             });
         }
 
@@ -93,7 +92,7 @@ namespace AsyncLockTests
         [TestMethod]
         public void MultipleThreadsThreadStartLockout()
         {
-            ThreadStart work = async () =>
+            var work = async () =>
             {
                 using (await _lock.LockAsync())
                 {
@@ -106,8 +105,7 @@ namespace AsyncLockTests
 
             ResourceSimulation(() =>
             {
-                var t = new Thread(work);
-                t.Start();
+                var t = Task.Run(work);
             });
         }
 

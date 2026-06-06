@@ -12,7 +12,7 @@ public class TryLockTests
     [TestMethod]
     public void NoContention()
     {
-        var @lock = new AsyncMutexLock("test");
+        using var @lock = new AsyncMutexLock(nameof(TryLockTests));
 
         Assert.IsTrue(@lock.TryLock(() => { }, default));
     }
@@ -20,7 +20,7 @@ public class TryLockTests
     [TestMethod]
     public void ContentionEarlyReturn()
     {
-        var @lock = new AsyncMutexLock("test");
+        using var @lock = new AsyncMutexLock(nameof(TryLockTests));
 
         using (@lock.Lock())
         {
@@ -45,7 +45,7 @@ public class TryLockTests
     private void ContentionalExecution(int unlockDelayMs, int lockTimeoutMs, bool expectedResult)
     {
         int step = 0;
-        var @lock = new AsyncMutexLock("test");
+        using var @lock = new AsyncMutexLock(nameof(TryLockTests));
 
         var locked = @lock.Lock();
         Interlocked.Increment(ref step);

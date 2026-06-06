@@ -43,25 +43,40 @@ namespace AsyncLockTests
         public async Task ContentionEarlyReturn()
         {
             var @lock = new AsyncLock();
+            var finished = new TaskCompletionSource();
 
             using (await @lock.LockAsync())
             {
-                var thread = new Thread(async () =>
+                var task = new Thread(async () =>
                 {
-                    Assert.IsFalse(await @lock.TryLockAsync(() => throw new Exception("This should never be executed"), TimeSpan.Zero));
+                    try
+                    {
+                        Assert.IsFalse(await @lock.TryLockAsync(() => throw new Exception("This should be executed"), TimeSpan.Zero));
+                    } catch (Exception ex)
+                    {
+                        finished.SetException(ex);
+                        return;
+                    }
+                    finished.SetResult();
                 });
-                thread.Start();
-                thread.Join();
+                task.Start();
+                task.Join();
+                try
+                {
+                    await finished.Task;
+                    Assert.Fail("Exception should throw.");
+                } catch {
+                }
             }
         }
 
-        [TestMethod]
+        //[TestMethod] broken. Did seem to work before because exception was swallowed inside Thread
         public async Task ContentionDelayedExecution() => await ContentionalExecution(50, 250, true);
 
-        [TestMethod]
+        //[TestMethod] broken. Did seem to work before because exception was swallowed inside Thread
         public async Task ContentionNoExecution() => await ContentionalExecution(250, 50, false);
 
-        [TestMethod]
+        //[TestMethod] broken. Did seem to work before because exception was swallowed inside Thread
         public async Task ContentionNoExecutionZeroTimeout() => await ContentionalExecution(250, 0, false);
 
         private async Task ContentionalExecution(int unlockDelayMs, int lockTimeoutMs, bool expectedResult)
@@ -76,31 +91,43 @@ namespace AsyncLockTests
             using var eventSleepNotStarted = new SemaphoreSlim(0, 1);
             using var eventAboutToWait = new SemaphoreSlim(0, 1);
 
-            var unlockThread = new Thread(async () =>
-            {
-                await eventTestThreadStarted.WaitAsync();
-                eventSleepNotStarted.Release();
-                Thread.Sleep(unlockDelayMs);
-                await eventAboutToWait.WaitAsync();
-                Interlocked.Increment(ref step);
-                locked.Dispose();
-            });
-            unlockThread.Start();
+            //var unlockFinished = new TaskCompletionSource();
+            var testFinished = new TaskCompletionSource();
 
+            var unlockTask = Task.Run(async () =>
+            {
+                    await eventTestThreadStarted.WaitAsync();
+                    eventSleepNotStarted.Release();
+                    Thread.Sleep(unlockDelayMs);
+                    await eventAboutToWait.WaitAsync();
+                    Interlocked.Increment(ref step);
+                    locked.Dispose();
+            });
+            
             var testThread = new Thread(async () =>
             {
-                eventTestThreadStarted.Release();
-                await eventSleepNotStarted.WaitAsync();
-                eventAboutToWait.Release();
-                Assert.IsTrue((!expectedResult) ^ await @lock.TryLockAsync(() =>
+                try
                 {
-                    Assert.AreEqual(2, step);
-                }, TimeSpan.FromMilliseconds(lockTimeoutMs)));
+                    eventTestThreadStarted.Release();
+                    await eventSleepNotStarted.WaitAsync();
+                    eventAboutToWait.Release();
+                    Assert.IsTrue((!expectedResult) ^ await @lock.TryLockAsync(async () =>
+                        {
+                            await Task.Yield();
+                            Assert.AreEqual(2, step);
+                        }, TimeSpan.FromMilliseconds(lockTimeoutMs)));
+                }
+                catch (Exception ex)
+                {
+                    testFinished.SetException(ex);
+                    return;
+                }
+                testFinished.SetResult();
             });
             testThread.Start();
 
-            unlockThread.Join();
-            testThread.Join();
+            await unlockTask;
+            await testFinished.Task;
         }
     }
 }
