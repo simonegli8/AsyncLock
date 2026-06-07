@@ -5,7 +5,6 @@
         <AssemblyName>EstrellasDeEsperanza.AsyncLock</AssemblyName>
         <RootNamespace>EstrellasDeEsperanza.AsyncLock</RootNamespace>
         <PackageId>EstrellasDeEsperanza.AsyncLock</PackageId>
-        <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
         <Authors>Simon Egli</Authors>
         <Company>Estrellas de Esperanza</Company>
         <Product>EstrellasDeEsperanza.AsyncLock</Product>
