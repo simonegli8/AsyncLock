@@ -49,7 +49,7 @@ public class AsyncMutexLock: IDisposable
 
     public AsyncMutexLock(string name)
     {
-        var assembly = Assewmbly.GetCallingAssembly();
+        var assembly = Assembly.GetCallingAssembly();
         this.name = NormalizeName($"{assembly.GetName().Name}.{name}");
     }
 
