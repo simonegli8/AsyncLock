@@ -51,7 +51,7 @@ public class AsyncMutexLock: IDisposable
 
     public AsyncMutexLock(string name, MutexScope scope = MutexScope.Machine)
     {
-        this.name = NormalizeName(name, scope);
+        this.name = LockFileName(name, scope);
     }
 
 #if !DEBUG
@@ -974,7 +974,7 @@ public class AsyncMutexLock: IDisposable
 
     public static bool UnixIsRoot => getuid() == 0;
 
-    private string NormalizeName(string name, MutexScope scope)
+    public static string LockFileName(string name, MutexScope scope = MutexScope.Machine)
     {
         if (Path.IsPathRooted(name)) return name;
 #if NETSTANDARD1_3
@@ -982,7 +982,14 @@ public class AsyncMutexLock: IDisposable
 #else
         if (name.StartsWith("Local\\", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("AsyncMutexLock does not support local mutexes");
         //if (IsWindows) return $"Global\\{name.Replace('/', '_')}";
-        name = Regex.Replace(name, @"[\ $%&""'=?!^_/:\t\r\n]", "-");
+
+        var pattern = @"[ $%&""'=?!^_:\t\r\n\\/]";
+        pattern = Path.DirectorySeparatorChar == '\\' ? 
+            @"[ $%&""'=?!^_:\t\r\n/]" :
+            pattern.Replace(Path.DirectorySeparatorChar.ToString(), "");
+
+        name = Regex.Replace(name, pattern, "-");
+
         if (scope == MutexScope.User)
         {
             var root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
