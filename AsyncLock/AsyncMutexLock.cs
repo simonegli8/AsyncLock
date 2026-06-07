@@ -561,7 +561,7 @@ public class AsyncMutexLock: IDisposable
     }
 
     // Mutex code
-    FileStream LockFileStream;
+    FileStream? LockFileStream;
     int FlockFile = -1;
 
     private const int LOCK_EX = 2;
