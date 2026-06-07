@@ -990,7 +990,8 @@ public class AsyncMutexLock: IDisposable
             var lockfile = Path.Combine(lockpath, $"{name}.lock");
             Directory.CreateDirectory(lockpath);
             return lockfile;
-        } else
+        }
+        else
         {
             var root = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
             var lockpath = Path.Combine(root, "asyncmutexlock");
