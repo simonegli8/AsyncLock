@@ -49,8 +49,12 @@ public class AsyncMutexLock: IDisposable
 
     public AsyncMutexLock(string name)
     {
+#if NETSTANDARD1_3
+        this.name = NormalizeName(name);
+#else
         var assembly = Assembly.GetCallingAssembly();
         this.name = NormalizeName($"{assembly.GetName().Name}.{name}");
+#endif
     }
 
 #if !DEBUG
