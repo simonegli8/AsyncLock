@@ -5,11 +5,13 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace NeoSmart.AsyncLock;
 
+public enum MutexScope { Machine, User }
 
 public class AsyncMutexLock: IDisposable
 {
@@ -47,14 +49,9 @@ public class AsyncMutexLock: IDisposable
     public static bool IsLinux => RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux);
     public static bool IsMac => RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX);
 
-    public AsyncMutexLock(string name)
+    public AsyncMutexLock(string name, MutexScope scope = MutexScope.Machine)
     {
-#if NETSTANDARD1_3
-        this.name = NormalizeName(name);
-#else
-        var assembly = Assembly.GetCallingAssembly();
-        this.name = NormalizeName($"{assembly.GetName().Name}.{name}");
-#endif
+        this.name = NormalizeName(name, scope);
     }
 
 #if !DEBUG
@@ -977,19 +974,31 @@ public class AsyncMutexLock: IDisposable
 
     public static bool UnixIsRoot => getuid() == 0;
 
-    private string NormalizeName(string name)
+    private string NormalizeName(string name, MutexScope scope)
     {
+        if (Path.IsPathRooted(name)) return name;
 #if NETSTANDARD1_3
-        return name;
+        throw new NotSupportedException("Only full filenames are supported as name on netstandard1.3");
 #else
+        if (name.StartsWith("Local\\", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("AsyncMutexLock does not support local mutexes");
         //if (IsWindows) return $"Global\\{name.Replace('/', '_')}";
-        if (IsLinux && UnixIsRoot) return $"/run/asyncmutexlock/{name}.lock";
-
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var lockpath = Path.Combine(appData, "asyncmutexlock");
-        var lockfile = Path.Combine(lockpath, $"{name}.lock");
-        Directory.CreateDirectory(lockpath);
-        return lockfile;
+        name = Regex.Replace(name, @"[\ $%&""'=?!^_/:\t\r\n]", "-");
+        if (scope == MutexScope.User)
+        {
+            var root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var lockpath = Path.Combine(root, "asyncmutexlock");
+            var lockfile = Path.Combine(lockpath, $"{name}.lock");
+            Directory.CreateDirectory(lockpath);
+            return lockfile;
+        }
+        else
+        {
+            var root = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            var lockpath = Path.Combine(root, "asyncmutexlock");
+            var lockfile = Path.Combine(lockpath, $"{name}.lock");
+            Directory.CreateDirectory(lockpath);
+            return lockfile;
+        }
 #endif
     }
 }
