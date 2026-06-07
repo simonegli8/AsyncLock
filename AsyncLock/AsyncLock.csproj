@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+hi﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>netstandard1.3;netstandard2.0;netstandard2.1</TargetFrameworks>
@@ -15,7 +15,7 @@
     <PackageProjectUrl>https://neosmart.net/blog/2017/asynclock-an-asyncawait-friendly-locking-library-for-c-and-net/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/neosmart/AsyncLock</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>asynclock, async await, async, await, lock, synchronization</PackageTags>
+    <PackageTags>asynclock, async await, async, await, lock, synchronization, mutex, async mutex</PackageTags>
     <PackageReleaseNotes>
 3.2: New TryLock() and TryLockAsync() methods, CancellationToken support for synchronous locking routines.
 
