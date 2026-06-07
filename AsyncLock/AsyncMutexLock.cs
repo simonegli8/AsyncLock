@@ -28,7 +28,7 @@ public class AsyncMutexLock: IDisposable
     internal long _owningId = UnlockedId;
     internal int _owningThreadId = (int)UnlockedId;
     private static long AsyncStackCounter = 0;
-    private string name;
+    public string FileName;
     // An AsyncLocal<T> is not really the task-based equivalent to a ThreadLocal<T>, in that
     // it does not track the async flow (as the documentation describes) but rather it is
     // associated with a stack snapshot. Mutation of the AsyncLocal in an await call does
@@ -51,7 +51,7 @@ public class AsyncMutexLock: IDisposable
 
     public AsyncMutexLock(string name, MutexScope scope = MutexScope.Machine)
     {
-        this.name = LockFileName(name, scope);
+        this.FileName = LockFileName(name, scope);
     }
 
 #if !DEBUG
@@ -591,7 +591,7 @@ public class AsyncMutexLock: IDisposable
     {
         var retryCount = 0;
 
-        var directory = Path.GetDirectoryName(name);
+        var directory = Path.GetDirectoryName(FileName);
         while (true)
         {
             try
@@ -632,7 +632,7 @@ public class AsyncMutexLock: IDisposable
                 {
                     // key arguments: 
                     // OpenOrCreate to be robust to the file existing or not
-                    lockFileStream = new FileStream(name, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1);
+                    lockFileStream = new FileStream(FileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1);
                     try
                     {
                         lockFileStream.WriteByte(0);
@@ -659,20 +659,20 @@ public class AsyncMutexLock: IDisposable
                     // This can happen in few cases:
 
                     // The path is already directory, so we'll never be able to open a handle of it as a file
-                    if (Directory.Exists(name))
+                    if (Directory.Exists(FileName))
                     {
-                        throw new InvalidOperationException($"Failed to create lock file '{name}' because it is already the name of a directory");
+                        throw new InvalidOperationException($"Failed to create lock file '{FileName}' because it is already the name of a directory");
                     }
 
                     // The file exists and is read-only
                     FileAttributes attributes;
-                    try { attributes = File.GetAttributes(name); }
+                    try { attributes = File.GetAttributes(FileName); }
                     catch { attributes = FileAttributes.Normal; } // e. g. could fail with FileNotFoundException
                     if (attributes.HasFlag(FileAttributes.ReadOnly))
                     {
                         // We could support this by eschewing DeleteOnClose once we detect that a file is read-only,
                         // but absent interest or a use-case we'll just throw for now
-                        throw new NotSupportedException($"Locking on read-only file '{name}' is not supported");
+                        throw new NotSupportedException($"Locking on read-only file '{FileName}' is not supported");
                     }
 
                     // Frustratingly, this error can be thrown transiently due to concurrent creation/deletion. Initially assume
@@ -708,7 +708,7 @@ public class AsyncMutexLock: IDisposable
             {
                 EnsureDirectoryExists();
 
-                file = open(name, O_CREAT | O_RDWR, 0x1A4); // 0644
+                file = open(FileName, O_CREAT | O_RDWR, 0x1A4); // 0644
 
                 if (file == -1) return false;
 
