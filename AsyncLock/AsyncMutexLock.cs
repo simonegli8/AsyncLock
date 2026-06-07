@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -48,7 +49,8 @@ public class AsyncMutexLock: IDisposable
 
     public AsyncMutexLock(string name)
     {
-        this.name = NormalizeName(name);
+        var assembly = Assembly.GetCallingAssembly();
+        this.name = NormalizeName($"{assembly.GetName().Name}.{name}");
     }
 
 #if !DEBUG
