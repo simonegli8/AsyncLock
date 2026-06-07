@@ -2,6 +2,7 @@
 
     <PropertyGroup>
         <TargetFrameworks>netstandard1.3;netstandard2.0;netstandard2.1</TargetFrameworks>
+        <AssemblyName>EstrellasDeEsperanza.AsyncLock</AssemblyName>
         <RootNamespace>EstrellasDeEsperanza.AsyncLock</RootNamespace>
         <PackageId>EstrellasDeEsperanza.AsyncLock</PackageId>
         <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
