@@ -1000,10 +1000,13 @@ public class AsyncMutexLock: IDisposable
         }
         else
         {
-            var root = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            string root;
+            if (IsMac) root = "/Library/Application Support";
+            else root = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
             var lockpath = Path.Combine(root, "asyncmutexlock");
             var lockfile = Path.Combine(lockpath, $"{name}.lock");
             Directory.CreateDirectory(lockpath);
+            if (!IsWindows) Unix.chmod(lockpath, 0x1FF);
             return lockfile;
         }
 #endif

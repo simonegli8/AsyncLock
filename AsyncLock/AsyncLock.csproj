@@ -28,7 +28,7 @@
         </PackageReleaseNotes>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <Nullable>enable</Nullable>
-        <LangVersion>latest</LangVersion>
+        <LangVersion>14</LangVersion>
         <PackageOutputPath>..\nupkg</PackageOutputPath>
     </PropertyGroup>
 
