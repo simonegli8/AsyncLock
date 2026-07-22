@@ -9,7 +9,7 @@ namespace EstrellasDeEsperanza.AsyncLock;
 
 
 [System.FlagsAttribute]
-public enum UnixFileMode
+internal enum UnixFileMode
 {
     None = 0,
     OtherExecute = 1,
@@ -27,7 +27,7 @@ public enum UnixFileMode
     All = 0x1ff
 }
 
-public class Unix
+internal class Unix
 {
     [DllImport("libc", SetLastError = true)]
     public static extern int chmod(string path, uint mode);
