@@ -976,8 +976,6 @@ public class AsyncMutexLock: IDisposable
 
     public static string LockFileName(string name, MutexScope scope = MutexScope.Machine)
     {
-        Debugger.Break();
-
         if (Path.IsPathRooted(name)) return name;
 #if NETSTANDARD1_3
         throw new NotSupportedException("Only full filenames are supported as name on netstandard1.3");
