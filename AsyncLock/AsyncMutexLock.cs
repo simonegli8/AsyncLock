@@ -573,7 +573,7 @@ public class AsyncMutexLock: IDisposable
     [DllImport("libc", SetLastError = true)]
     private static extern int flock(int fd, int operation);
     [DllImport("libc", SetLastError = true)]
-    private static extern int open(string pathname, int flags, uint mode);
+    private static extern int open([MarshalAs(UnmanagedType.LPUTF8Str)] string pathname, int flags, uint mode);
 
     [DllImport("libc", SetLastError = true)]
     private static extern int close(int fd);
@@ -707,6 +707,10 @@ public class AsyncMutexLock: IDisposable
             try
             {
                 EnsureDirectoryExists();
+
+Debug.WriteLine(FileName);
+Debug.WriteLine(File.Exists(FileName));
+Debug.WriteLine(Directory.Exists(Path.GetDirectoryName(FileName)!));
 
                 file = open(FileName, O_CREAT | O_RDWR, 0x1A4); // 0644
 
