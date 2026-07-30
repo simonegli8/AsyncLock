@@ -573,8 +573,7 @@ public class AsyncMutexLock: IDisposable
     [DllImport("libc", SetLastError = true)]
     private static extern int flock(int fd, int operation);
     [DllImport("libc", SetLastError = true)]
-    private static extern int open([MarshalAs(UnmanagedType.LPUTF8Str)] string pathname, int flags, uint mode);
-
+    private static extern int open(string pathname, int flags, uint mode);
     [DllImport("libc", SetLastError = true)]
     private static extern int close(int fd);
 
