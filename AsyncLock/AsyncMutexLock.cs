@@ -995,7 +995,7 @@ public class AsyncMutexLock: IDisposable
         if (scope == MutexScope.User)
         {
             var root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var lockpath = Path.Combine(root, "asyncmutexlock");
+            var lockpath = Path.Combine(root, "EstrellasDeEsperanza-AsyncMutexLock");
             var lockfile = Path.Combine(lockpath, $"{name}.lock");
             Directory.CreateDirectory(lockpath);
             return lockfile;
@@ -1005,7 +1005,7 @@ public class AsyncMutexLock: IDisposable
             string root;
             if (IsMac) root = "/Library/Application Support";
             else root = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            var lockpath = Path.Combine(root, "asyncmutexlock");
+            var lockpath = Path.Combine(root, "EstrellasDeEsperanza-AsyncMutexLock");
             var lockfile = Path.Combine(lockpath, $"{name}.lock");
             Directory.CreateDirectory(lockpath);
             if (!IsWindows) Unix.chmod(lockpath, 0x1FF);
