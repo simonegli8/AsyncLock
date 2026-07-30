@@ -13,11 +13,11 @@ dotnet pack AsyncLock.slnx \
     -p:AssemblyVersion="$PackageVersion" \
     -p:DebugType=embedded
 
-dotnet pack AsyncLock.slnx -c "$Configuration" \
-    -p:Version="$PackageVersion" \
-    -p:FileVersion="$PackageVersion" \
-    -p:AssemblyVersion="$PackageVersion" \
-    -p:DebugType=portable \
-    -p:DebugSymbols=true \
-    -p:IncludeSymbols=true \
-    -p:SymbolPackageFormat=snupkg
+#dotnet pack AsyncLock.slnx -c "$Configuration" \
+#    -p:Version="$PackageVersion" \
+#    -p:FileVersion="$PackageVersion" \
+#    -p:AssemblyVersion="$PackageVersion" \
+#    -p:DebugType=portable \
+#    -p:DebugSymbols=true \
+#    -p:IncludeSymbols=true \
+#    -p:SymbolPackageFormat=snupkg
