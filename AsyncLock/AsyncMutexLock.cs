@@ -710,7 +710,11 @@ public class AsyncMutexLock: IDisposable
 
                 file = open(FileName, O_CREAT | O_RDWR, 0x1A4); // 0644
 
-                if (file == -1) return false;
+                if (file == -1)
+                {
+                    var errno = Marshal.GetLastWin32Error();
+                    return false;
+                }
 
                 if (flock(file, LOCK_EX | LOCK_NB) == 0)
                 {
