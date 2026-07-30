@@ -566,8 +566,11 @@ public class AsyncMutexLock: IDisposable
     private const int LOCK_UN = 8;
     private const int O_CREAT = 0x40;
     private const int O_RDWR = 0x2;
+	private const int O_CREAT_Mac = 0x0200;
+	private const int O_RDWR_Mac = 0x0002;
 
-    const int pollMilliseconds = 100;
+
+	const int pollMilliseconds = 100;
     static readonly TimeSpan pollTimeSpan = TimeSpan.FromMilliseconds(pollMilliseconds);
 
     [DllImport("libc", SetLastError = true)]
@@ -707,11 +710,8 @@ public class AsyncMutexLock: IDisposable
             {
                 EnsureDirectoryExists();
 
-Debug.WriteLine(FileName);
-Debug.WriteLine(File.Exists(FileName));
-Debug.WriteLine(Directory.Exists(Path.GetDirectoryName(FileName)!));
-
-                file = open(FileName, O_CREAT | O_RDWR, 0x1A4); // 0644
+                if (IsMac) file = open(FileName, O_CREAT_Mac | O_RDWR_Mac, 0x1A4); // 0644
+				else file = open(FileName, O_CREAT | O_RDWR, 0x1A4); // 0644
 
                 if (file == -1)
                 {
