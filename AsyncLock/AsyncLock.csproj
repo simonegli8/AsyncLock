@@ -5,6 +5,7 @@
         <AssemblyName>EstrellasDeEsperanza.AsyncLock</AssemblyName>
         <RootNamespace>EstrellasDeEsperanza.AsyncLock</RootNamespace>
         <PackageId>EstrellasDeEsperanza.AsyncLock</PackageId>
+        <IncludePdbs>true</IncludePdbs>
         <Authors>Simon Egli</Authors>
         <Company>Estrellas de Esperanza</Company>
         <Product>EstrellasDeEsperanza.AsyncLock</Product>
@@ -30,6 +31,11 @@
         <Nullable>enable</Nullable>
         <LangVersion>14</LangVersion>
         <PackageOutputPath>..\nupkg</PackageOutputPath>
+        <AllowedOutputExtensionsInPackageBuildOutputFolder Condition="'$(IncludePdbs)' == 'true'">
+            $(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb
+        </AllowedOutputExtensionsInPackageBuildOutputFolder>
+        <DebugType>portable</DebugType>
+        <DebugSymbols>true</DebugSymbols>
     </PropertyGroup>
 
     <PropertyGroup>

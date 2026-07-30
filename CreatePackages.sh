@@ -10,9 +10,8 @@ dotnet pack AsyncLock.slnx \
     -c "$Configuration" \
     -p:Version="$PackageVersion" \
     -p:FileVersion="$PackageVersion" \
-    -p:AssemblyVersion="$PackageVersion" \
-    -p:DebugType=embedded
-
+    -p:AssemblyVersion="$PackageVersion"
+    
 #dotnet pack AsyncLock.slnx -c "$Configuration" \
 #    -p:Version="$PackageVersion" \
 #    -p:FileVersion="$PackageVersion" \
