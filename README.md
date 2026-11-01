@@ -74,3 +74,23 @@ private class AsyncLockTest
 The class `AsyncMutexLock` works exactly like `AsyncLock`, except that it uses a cross process machine wide file lock.
 It can be used as an async friendly version of a global Mutex. For this, you create a named lock by calling the constructor
 `AsyncMutexLock("MyMutexName")`. You can then synchronize processes using this global lock.
+
+**Who can use the lock.** A lock is held by whoever can open its file, even read-only, so a lock file that other users can open is a lock
+that other users can hold: a denial of service for whoever made it. That is why, on Unix, the file of a named lock is for its creator
+alone (mode 0600). The folder for the named locks is open to every user, like `/tmp` (mode 1777, rwxrwxrwt): every user can make locks in
+it, and only the owner of a lock file (or root) can remove or rename it, so nobody can take the lock file of another away. It is
+`/var/lock/EstrellasDeEsperanza-AsyncMutexLock` on Linux (`/var/lock` is `/run/lock`, which is empty after a boot and is not cleaned up
+while the machine runs), `/var/tmp/EstrellasDeEsperanza-AsyncMutexLock` on macOS and the BSDs (macOS has no `/var/lock`, and
+`/Library/Application Support` belongs to root), and `%ProgramData%\EstrellasDeEsperanza-AsyncMutexLock` on Windows.
+Both together mean that every user can make his own locks, but a named lock is only usable by the user who made it, and a second user who
+tries to use it gets an `UnauthorizedAccessException` instead of waiting for a lock that nobody holds. The same is true if a lock file
+cannot be created at all.
+On Debian and Ubuntu every user can make the folder under `/var/lock`. On openSUSE, Arch and others `/var/lock` belongs to root (mode 755), so
+root has to make the folder once after every boot (`mkdir -m 1777 /var/lock/EstrellasDeEsperanza-AsyncMutexLock`, from a systemd
+`tmpfiles.d` file, say: `d /run/lock/EstrellasDeEsperanza-AsyncMutexLock 1777 root root -`); until then a user who is not root gets an
+`UnauthorizedAccessException` that says so.
+Two things follow. The owner of the folder can remove any lock file in it, sticky bit or not, and in a folder that every user can make, the
+first user who makes it owns it. So these locks are for processes that cooperate, not a protection against a user who wants to get in the
+way. A lock that several users have to take, or that a service running as root relies on, belongs in a folder that exactly these users can
+enter, given as a full path: `new AsyncMutexLock("/etc/my-service/my.lock")` with that folder owned by root or by a group; whoever cannot
+enter the folder cannot hold the lock. `MutexScope.User` keeps the file in the folder of the user.

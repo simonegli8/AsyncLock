@@ -579,6 +579,14 @@ public class AsyncMutexLock: IDisposable
     private static extern int open(string pathname, int flags, uint mode);
     [DllImport("libc", SetLastError = true)]
     private static extern int close(int fd);
+    [DllImport("libc", SetLastError = true)]
+    private static extern int fchmod(int fd, uint mode);
+
+    private const int O_EXCL = 0x80;
+    private const int O_EXCL_Mac = 0x0800;
+    private const int EPERM = 1;
+    private const int EACCES = 13;
+    private const uint LockFileMode = 0x180; // 0600
 
     const int MaxUnauthorizedAccessExceptionRetries = 1600;
     private static bool CanRetryTransientFileSystemError(ref int retryCount)
@@ -617,6 +625,52 @@ public class AsyncMutexLock: IDisposable
                 throw new InvalidOperationException($"Failed to ensure that lock file directory {directory} exists", ex);
             }
         }
+    }
+
+    /// <summary>
+    /// Opens the lock file of a machine wide lock on Unix, creating it if it does not exist. The lock is a flock, and flock needs only
+    /// read access: whoever can open the file, even read-only, can hold the lock and keep everybody else out. So the lock file is for its
+    /// owner alone (mode 0600): a file that other users can open is a lock that other users can hold, a denial of service for whoever
+    /// made it.
+    /// <list type="bullet">
+    /// <item>A file that is created here (O_CREAT | O_EXCL, which also refuses a symbolic link) gets mode 0600. The mode is set again with
+    /// fchmod because of the umask, on the descriptor of the file that was just created. A file that was already there is never
+    /// changed, so a file or symbolic link that somebody else put there cannot make a root process change the permissions of another
+    /// file.</item>
+    /// <item>A file that is already there is opened as it is. If this user may not open it for writing (it belongs to another user), that
+    /// is an <see cref="UnauthorizedAccessException"/>: the lock is not taken by somebody else, this user may not use it, and waiting
+    /// would never help. So every user can make locks in the shared folder, but a lock is only usable by the user who made it. A lock
+    /// that several users have to take belongs in a folder that exactly these users can enter, given as a full path.</item>
+    /// <item>The same goes for the folder: if the lock file cannot be created there, that is an
+    /// <see cref="UnauthorizedAccessException"/> too, and not a lock that somebody else holds.</item>
+    /// </list>
+    /// Returns -1 if the file could not be opened for another reason, for example because it was removed in the meantime; the caller
+    /// tries again.
+    /// </summary>
+    private int OpenUnixLockFile()
+    {
+        var create = IsMac ? O_CREAT_Mac : O_CREAT;
+        var exclusive = IsMac ? O_EXCL_Mac : O_EXCL;
+        var readWrite = IsMac ? O_RDWR_Mac : O_RDWR;
+
+        var file = open(FileName, create | exclusive | readWrite, LockFileMode);
+        if (file != -1)
+        {
+            fchmod(file, LockFileMode);
+            return file;
+        }
+
+        // Not allowed to create it (the folder cannot be written or entered): that is not a lock that somebody else holds, and trying
+        // again would never help. Without this the open below fails with "no such file" and the caller waits for nothing.
+        var errno = Marshal.GetLastWin32Error();
+        if (errno == EACCES || errno == EPERM) throw new UnauthorizedAccessException($"No permission to create the lock file '{FileName}'.");
+
+        file = open(FileName, readWrite, 0);
+        if (file != -1) return file;
+
+        errno = Marshal.GetLastWin32Error();
+        if (errno == EACCES || errno == EPERM) throw new UnauthorizedAccessException($"No permission to open the lock file '{FileName}'.");
+        return -1;
     }
 
     internal bool TryMutexAcquireOnce(CancellationToken cancel = default)
@@ -710,8 +764,7 @@ public class AsyncMutexLock: IDisposable
             {
                 EnsureDirectoryExists();
 
-                if (IsMac) file = open(FileName, O_CREAT_Mac | O_RDWR_Mac, 0x1A4); // 0644
-				else file = open(FileName, O_CREAT | O_RDWR, 0x1A4); // 0644
+                file = OpenUnixLockFile();
 
                 if (file == -1)
                 {
@@ -1007,13 +1060,32 @@ public class AsyncMutexLock: IDisposable
         }
         else
         {
-            string root;
-            if (IsMac) root = "/Library/Application Support";
-            else root = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            // The folder of the locks of every user must be a place where every user can make a folder, and where nothing is cleaned up
+            // while a lock is held (a lock file that is removed while it is held lets a second process hold "the same" lock):
+            //  - Windows: %ProgramData%.
+            //  - Linux: /var/lock (that is /run/lock, a tmpfs that is empty after a boot): the place for lock files. On Debian and Ubuntu
+            //    every user can make a folder in it (1777); on openSUSE, Arch and others it belongs to root (755), and root has to make
+            //    the folder once.
+            //  - macOS and the BSDs: there is no /var/lock in which every user can write (macOS has none, and /Library/Application Support
+            //    belongs to root), so /var/tmp, which is 1777 and is not cleaned up the way /tmp is.
+            var root = IsWindows ? Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) :
+                IsLinux ? "/var/lock" : "/var/tmp";
             var lockpath = Path.Combine(root, "EstrellasDeEsperanza-AsyncMutexLock");
             var lockfile = Path.Combine(lockpath, $"{name}.lock");
-            Directory.CreateDirectory(lockpath);
-            if (!IsWindows) Unix.chmod(lockpath, 0x1FF);
+            try
+            {
+                Directory.CreateDirectory(lockpath);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new UnauthorizedAccessException(
+                    $"No permission to create the folder '{lockpath}' for the locks. On Unix it has to be made once by root: mkdir -m 1777 '{lockpath}'.", ex);
+            }
+            // 1777 (rwxrwxrwt), like /tmp: every user can create locks here, and only the owner of a lock file (or root) can remove or
+            // rename it. Without the sticky bit a user could take the lock file of another away, and a second process would then make a
+            // new file and hold "the same" lock at the same time. The lock files themselves are for their owner alone, see
+            // OpenUnixLockFile. (Only the owner of the folder and root can change its mode, so this takes effect where the folder is made.)
+            if (!IsWindows) Unix.chmod(lockpath, 0x3FF);
             return lockfile;
         }
 #endif
