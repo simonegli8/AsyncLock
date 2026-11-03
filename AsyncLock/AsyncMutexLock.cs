@@ -1034,9 +1034,16 @@ public class AsyncMutexLock: IDisposable
 
     public static bool UnixIsRoot => getuid() == 0;
 
+    public static void CreateLockFileDirectory(string name, MutexScope scope = MutexScope.Machine) => LockFileName(name, scope);
+
     public static string LockFileName(string name, MutexScope scope = MutexScope.Machine)
     {
-        if (Path.IsPathRooted(name)) return name;
+        if (Path.IsPathRooted(name))
+        {
+            var dir = Path.GetDirectoryName(name);
+            Directory.CreateDirectory(dir);
+            return name;
+        }
 #if NETSTANDARD1_3
         throw new NotSupportedException("Only full filenames are supported as name on netstandard1.3");
 #else
