@@ -74,8 +74,27 @@ private class AsyncLockTest
 The class `AsyncMutexLock` works exactly like `AsyncLock`, except that it uses a cross process machine wide file lock.
 It can be used as an async friendly version of a global Mutex. For this, you create a named lock by calling the constructor
 `AsyncMutexLock("MyMutexName")`. You can then synchronize processes using this global lock.
+If you want to create an `AsyncMutexLock` that is only usable by the current user, you can use the constructor 
+`AsyncMutexLock("MyMutexName", MutexScope.User)`, for a machine wide lock, use `MutexScope.Machine`.
+The default is `MutexScope.Machine`.
 
-**Who can use the lock.** A lock is held by whoever can open its file, even read-only, so a lock file that other users can open is a lock
+### Lock File
+In order to synchronize `AsyncMutexLock` uses a lock file in the file system. This file should be in a secure folder,
+otherwise unauthorized users can open the file and take the lock away from the process that created it, and make a
+Denial of Service attack. Therefore, the lock file is made writeable and readable only by the user that created it, and
+the folder for the lock files is made writeable and readable by every user, but not deletable or renamable by any user
+except the owner of a lock file. The default folder for the lock files is `/var/lock/EstrellasDeEsperanza-AsyncMutexLock`
+on Linux, `/var/tmp/EstrellasDeEsperanza-AsyncMutexLock` on macOS
+and the BSDs, and `%ProgramData%\EstrellasDeEsperanza-AsyncMutexLock` on Windows.
+
+You can also specify a full path to a folder that only the users that should be able to take the lock can enter,
+for example `new AsyncMutexLock("/etc/my-service/my.lock")` with that folder owned by root or by a group;
+whoever cannot enter the folder cannot hold the lock.
+
+If you want to create the lock folder in an installer, call `AsyncMutexLock.CreateLockFolder("MyLock")` in the
+installer.
+
+A lock is held by whoever can open its file, even read-only, so a lock file that other users can open is a lock
 that other users can hold: a denial of service for whoever made it. That is why, on Unix, the file of a named lock is for its creator
 alone (mode 0600). The folder for the named locks is open to every user, like `/tmp` (mode 1777, rwxrwxrwt): every user can make locks in
 it, and only the owner of a lock file (or root) can remove or rename it, so nobody can take the lock file of another away. It is
